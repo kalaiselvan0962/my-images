@@ -4,58 +4,87 @@
 <meta charset="UTF-8">
 <title>GitHub Pages Image Uploader</title>
 <style>
-  body { font-family: Arial; text-align: center; padding: 50px; }
-  input, button { margin: 10px; padding: 8px; font-size: 16px; }
-  .preview img { max-width: 300px; margin: 10px; border: 1px solid #ddd; }
-  input[type=text] { width: 80%; padding: 5px; }
+body { font-family: Arial; text-align: center; padding: 50px; }
+#drop-area {
+  border: 2px dashed #ccc;
+  padding: 40px;
+  margin: 20px;
+  cursor: pointer;
+}
+#drop-area.hover { border-color: #333; }
+.preview img { max-width: 300px; margin: 10px; border: 1px solid #ddd; }
+input[type=text] { width: 80%; padding: 5px; margin-top: 10px; }
+button { padding: 10px 20px; font-size: 16px; margin-top: 10px; cursor: pointer; }
 </style>
 </head>
 <body>
 <h2>Drag & Drop Image Upload</h2>
-<input type="file" id="fileInput" accept="image/*"><br>
-<button onclick="uploadImage()">Upload</button>
+
+<div id="drop-area">
+  <p>Drag & drop an image here or click to select</p>
+  <input type="file" id="fileElem" accept="image/*" style="display:none">
+</div>
+
 <div class="preview" id="preview"></div>
 
 <script>
-const repoUser = "kalaiselvan0962";  // your GitHub username
-const repoName = "my-images";        // your repo name
-const folder = "uploads";            // folder in repo
+const dropArea = document.getElementById("drop-area");
+const fileInput = document.getElementById("fileElem");
+const repoUser = "kalaiselvan0962";
+const repoName = "my-images";
+const folder = "uploads";
 
-async function uploadImage() {
-  const file = document.getElementById("fileInput").files[0];
+// Drag & drop
+dropArea.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  dropArea.classList.add("hover");
+});
+
+dropArea.addEventListener("dragleave", () => {
+  dropArea.classList.remove("hover");
+});
+
+dropArea.addEventListener("drop", (e) => {
+  e.preventDefault();
+  dropArea.classList.remove("hover");
+  const file = e.dataTransfer.files[0];
+  handleFile(file);
+});
+
+dropArea.addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", () => handleFile(fileInput.files[0]));
+
+async function handleFile(file) {
   if (!file) return alert("Select an image!");
 
   const reader = new FileReader();
   reader.onloadend = async () => {
     const base64Data = reader.result.split(",")[1];
 
-    // Trigger GitHub workflow
-    const res = await fetch(`https://api.github.com/repos/${repoUser}/${repoName}/actions/workflows/upload-image.yml/dispatches`, {
-      method: "POST",
-      headers: {
-        "Accept": "application/vnd.github+json",
-        "Authorization": `token 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`
-      },
-      body: JSON.stringify({
-        ref: "main",
-        inputs: {
-          filename: file.name,
-          base64image: base64Data
-        }
-      })
-    });
+    document.getElementById("preview").innerHTML = `<p>Uploading...</p>`;
 
-    if (res.ok) {
-      const link = `https://${repoUser}.github.io/${repoName}/${folder}/${file.name}`;
-      document.getElementById("preview").innerHTML = `
-        <p>Upload triggered! Your image will appear shortly:</p>
-        <img src="${link}" alt="Preview">
-        <input type="text" value="${link}" readonly onclick="this.select()">
-        <p>Note: It may take a few seconds for the workflow to commit and GitHub Pages to update.</p>
-      `;
-    } else {
-      console.log(await res.json());
-      alert("Upload failed. Check console for details.");
+    try {
+      const res = await fetch('/.netlify/functions/upload', { // adjust URL if needed
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, base64image: base64Data })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        document.getElementById("preview").innerHTML = `
+          <p>Upload successful!</p>
+          <img src="${data.link}" alt="Preview">
+          <input type="text" value="${data.link}" readonly onclick="this.select()">
+        `;
+      } else {
+        console.error(data);
+        alert("Upload failed.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Upload failed due to network error.");
     }
   };
   reader.readAsDataURL(file);
