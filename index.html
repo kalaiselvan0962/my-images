@@ -1,73 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Image Uploader - GitHub Pages</title>
-  <style>
-    body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-    input[type=file] { margin: 20px; }
-    .preview { margin-top: 20px; }
-    img { max-width: 300px; margin: 10px; border: 1px solid #ddd; }
-    .link-box { margin-top: 10px; }
-    input[type=text] { width: 80%; padding: 5px; }
-  </style>
+<meta charset="UTF-8">
+<title>GitHub Pages Image Uploader</title>
+<style>
+  body { font-family: Arial; text-align: center; padding: 50px; }
+  input, button { margin: 10px; padding: 8px; font-size: 16px; }
+  .preview img { max-width: 300px; margin: 10px; border: 1px solid #ddd; }
+  input[type=text] { width: 80%; padding: 5px; }
+</style>
 </head>
 <body>
-  <h2>Upload Images to GitHub</h2>
-  <p>Choose an image, upload it to your repo, and get a shareable link.</p>
-  
-  <input type="file" id="fileInput" accept="image/*"><br>
-  <button onclick="uploadImage()">Upload</button>
+<h2>Drag & Drop Image Upload</h2>
+<input type="file" id="fileInput" accept="image/*"><br>
+<button onclick="uploadImage()">Upload</button>
+<div class="preview" id="preview"></div>
 
-  <div class="preview" id="preview"></div>
+<script>
+const repoUser = "kalaiselvan0962";  // your GitHub username
+const repoName = "my-images";        // your repo name
+const folder = "uploads";            // folder in repo
 
-  <script>
-    const repoUser = "kalaiselvan0962";     // change this
-    const repoName = "my-images";         // change this
-    const branch = "main";                // branch name
-    const folder = "uploads";             // folder where images are stored
+async function uploadImage() {
+  const file = document.getElementById("fileInput").files[0];
+  if (!file) return alert("Select an image!");
 
-    async function uploadImage() {
-      const fileInput = document.getElementById("fileInput");
-      const file = fileInput.files[0];
-      if (!file) {
-        alert("Please select an image first.");
-        return;
-      }
+  const reader = new FileReader();
+  reader.onloadend = async () => {
+    const base64Data = reader.result.split(",")[1];
 
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64Data = reader.result.split(",")[1];
-
-        const url = `https://api.github.com/repos/${repoUser}/${repoName}/contents/${folder}/${file.name}`;
-
-        const res = await fetch(url, {
-          method: "PUT",
-          headers: {
-            "Authorization": `token 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`, // create a PAT (classic)
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            message: `Upload ${file.name}`,
-            content: base64Data,
-            branch: branch,
-          }),
-        });
-
-        if (res.ok) {
-          const link = `https://${repoUser}.github.io/${repoName}/${folder}/${file.name}`;
-          document.getElementById("preview").innerHTML = `
-            <p>Uploaded Successfully!</p>
-            <img src="${link}" alt="Preview">
-            <div class="link-box">
-              <input type="text" value="${link}" readonly onclick="this.select()">
-            </div>`;
-        } else {
-          alert("Upload failed. Check token/repo settings.");
+    // Trigger GitHub workflow
+    const res = await fetch(`https://api.github.com/repos/${repoUser}/${repoName}/actions/workflows/upload-image.yml/dispatches`, {
+      method: "POST",
+      headers: {
+        "Accept": "application/vnd.github+json",
+        "Authorization": `token YOUR_GITHUB_PAT_WITH_WORKFLOW_SCOPE`
+      },
+      body: JSON.stringify({
+        ref: "main",
+        inputs: {
+          filename: file.name,
+          base64image: base64Data
         }
-      };
-      reader.readAsDataURL(file);
+      })
+    });
+
+    if (res.ok) {
+      const link = `https://${repoUser}.github.io/${repoName}/${folder}/${file.name}`;
+      document.getElementById("preview").innerHTML = `
+        <p>Upload triggered! Your image will appear shortly:</p>
+        <img src="${link}" alt="Preview">
+        <input type="text" value="${link}" readonly onclick="this.select()">
+        <p>Note: It may take a few seconds for the workflow to commit and GitHub Pages to update.</p>
+      `;
+    } else {
+      console.log(await res.json());
+      alert("Upload failed. Check console for details.");
     }
-  </script>
+  };
+  reader.readAsDataURL(file);
+}
+</script>
 </body>
 </html>
