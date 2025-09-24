@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Image Uploader - GitHub Pages</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+    input[type=file] { margin: 20px; }
+    .preview { margin-top: 20px; }
+    img { max-width: 300px; margin: 10px; border: 1px solid #ddd; }
+    .link-box { margin-top: 10px; }
+    input[type=text] { width: 80%; padding: 5px; }
+  </style>
+</head>
+<body>
+  <h2>Upload Images to GitHub</h2>
+  <p>Choose an image, upload it to your repo, and get a shareable link.</p>
+  
+  <input type="file" id="fileInput" accept="image/*"><br>
+  <button onclick="uploadImage()">Upload</button>
+
+  <div class="preview" id="preview"></div>
+
+  <script>
+    const repoUser = "your-username";     // change this
+    const repoName = "my-images";         // change this
+    const branch = "main";                // branch name
+    const folder = "uploads";             // folder where images are stored
+
+    async function uploadImage() {
+      const fileInput = document.getElementById("fileInput");
+      const file = fileInput.files[0];
+      if (!file) {
+        alert("Please select an image first.");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64Data = reader.result.split(",")[1];
+
+        const url = `https://api.github.com/repos/${repoUser}/${repoName}/contents/${folder}/${file.name}`;
+
+        const res = await fetch(url, {
+          method: "PUT",
+          headers: {
+            "Authorization": `token YOUR_GITHUB_TOKEN`, // create a PAT (classic)
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            message: `Upload ${file.name}`,
+            content: base64Data,
+            branch: branch,
+          }),
+        });
+
+        if (res.ok) {
+          const link = `https://${repoUser}.github.io/${repoName}/${folder}/${file.name}`;
+          document.getElementById("preview").innerHTML = `
+            <p>Uploaded Successfully!</p>
+            <img src="${link}" alt="Preview">
+            <div class="link-box">
+              <input type="text" value="${link}" readonly onclick="this.select()">
+            </div>`;
+        } else {
+          alert("Upload failed. Check token/repo settings.");
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  </script>
+</body>
+</html>
